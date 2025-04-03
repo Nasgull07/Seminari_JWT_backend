@@ -10,10 +10,12 @@ const checkJwt = (req: RequestExt, res: Response, next: NextFunction) => {
     try {
         const jwtByUser = req.headers.authorization || null;
         const jwt = jwtByUser?.split(' ').pop(); // ['Bearer', '11111'] -> ['11111']
-        console.log(jwt);
+        console.log("Token recibido:", jwt);
+
         const isUser = verifyToken(`${jwt}`);
         
         if (!isUser) {
+            console.log("NO_TIENES_UN_JWT_VALIDO");
             return res.status(401).send("NO_TIENES_UN_JWT_VALIDO"); // return para evitar llamar a next()
         }
         

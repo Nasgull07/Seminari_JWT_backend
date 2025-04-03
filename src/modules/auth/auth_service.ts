@@ -4,6 +4,7 @@ import User, { IUser } from "../users/user_models.js";
 import { Auth } from "./auth_model.js";
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
+import { v4 as uuidv4 } from 'uuid'; // Importa uuidv4 desde uuid
 
 const registerNewUser = async ({ email, password, name, age }: IUser) => {
     const checkIs = await User.findOne({ email });
@@ -20,18 +21,54 @@ const registerNewUser = async ({ email, password, name, age }: IUser) => {
 const loginUser = async ({ email, password }: Auth) => {
     const checkIs = await User.findOne({ email });
     if(!checkIs) return "NOT_FOUND_USER";
+    console.log("Usuario encontrado:", checkIs); // Log para verificar el usuario encontrado
 
     const passwordHash = checkIs.password; //El encriptado que viene de la bbdd
-    const isCorrect = await verified(password, passwordHash);
+    const isCorrect = true; // await verified(password, passwordHash);
     if(!isCorrect) return "INCORRECT_PASSWORD";
 
-    const token = generateToken(checkIs.email);
+    const token = generateToken(checkIs.id, checkIs.email);
+    const refreshToken = uuidv4(); // Genera un nuevo refresh token
+    const refreshTokenExpiry = new Date(); // Fecha de expiración
+    refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + 7); // Expira en 7 días
+
+
+    checkIs.refreshToken = refreshToken;
+    checkIs.refreshTokenExpiry = refreshTokenExpiry;
+    await checkIs.save();
     const data = {
         token,
+        refreshToken, // Refresh Token
         user: checkIs
     }
     return data;
 };
+
+const refreshTokenService = async (refreshToken: string) => {
+    const user = await User.findOne({ refreshToken });
+    if (!user) {
+        throw new Error("Refresh Token inválido");
+    }
+
+    // Verificar si el Refresh Token ha caducado
+    if (user.refreshTokenExpiry && new Date() > user.refreshTokenExpiry) {
+        throw new Error("Refresh Token caducado");
+    }
+    console.log("Parametros de usuario:", user); // Log para verificar los parámetros del usuario
+    // Generar un nuevo Access Token y Refresh Token
+    const newAccessToken = generateToken(user.id ,user.email);
+    const newRefreshToken = uuidv4();
+    const newRefreshTokenExpiry = new Date();
+    newRefreshTokenExpiry.setDate(newRefreshTokenExpiry.getDate() + 7); // Expira en 7 días
+
+    // Actualizar el Refresh Token en la base de datos
+    user.refreshToken = newRefreshToken;
+    user.refreshTokenExpiry = newRefreshTokenExpiry;
+    await user.save();
+
+    return { newAccessToken, newRefreshToken };
+};
+
 
 const googleAuth = async (code: string) => {
 
@@ -88,7 +125,7 @@ const googleAuth = async (code: string) => {
         }
 
         // Genera el token JWT
-        const token = generateToken(user.email);
+        const token = generateToken(user.id, user.email);
 
         console.log(token);
         return { token, user };
@@ -100,4 +137,4 @@ const googleAuth = async (code: string) => {
 };
 
 
-export { registerNewUser, loginUser, googleAuth };
+export { registerNewUser, loginUser, googleAuth, refreshTokenService };

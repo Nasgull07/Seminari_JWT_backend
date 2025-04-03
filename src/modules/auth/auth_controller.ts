@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { registerNewUser, loginUser, googleAuth } from "../auth/auth_service.js";
+import User from "../users/user_models.js";
+import { refreshTokenService } from "./auth_service.js";
 
 const registerCtrl = async ({body}: Request, res: Response) => {
     try{
@@ -11,11 +13,34 @@ const registerCtrl = async ({body}: Request, res: Response) => {
 };
 
 
+const refreshAccessToken = async (req: Request, res: Response) => {
+    try {
+        const { refreshToken } = req.body;
+
+        if (!refreshToken) {
+            return res.status(400).json({ message: "Refresh Token es requerido" });
+        }
+
+        // Buscar el usuario asociado al Refresh Token
+        const user = await User.findOne({ refreshToken });
+        if (!user) {
+            return res.status(401).json({ message: "Refresh Token inválido" });
+        }
+
+        const { newAccessToken, newRefreshToken } = await refreshTokenService(refreshToken);
+
+
+        return res.json({ token: newAccessToken, refreshToken: newRefreshToken });
+    } catch (error: any) {
+        console.error("Error al renovar el Access Token:", error);
+        return res.status(500).json({ message: "Error interno del servidor" });
+    }
+};
 
 const loginCtrl = async ({ body }: Request, res: Response) => {
     try {
         const { name, email, password } = body;
-        const responseUser = await loginUser({name, email, password });
+        const responseUser = await loginUser({email, password });
 
         if (responseUser === 'INCORRECT_PASSWORD') {
             return res.status(403).json({ message: 'Contraseña incorrecta' });
@@ -83,4 +108,4 @@ const googleAuthCallback = async (req: Request, res: Response) => {
 };
 
 
-export { registerCtrl, loginCtrl,googleAuthCtrl, googleAuthCallback };
+export { registerCtrl, loginCtrl,googleAuthCtrl, googleAuthCallback, refreshAccessToken };

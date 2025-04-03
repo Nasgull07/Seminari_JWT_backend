@@ -21,6 +21,8 @@ const userSchema = new mongoose.Schema(
             unique: true
         },
         googleId: { type: String },
+        refreshToken: { type: String }, // Nuevo campo
+        refreshTokenExpiry: { type: Date, default: null },
     },
     {
         versionKey: false,
@@ -34,7 +36,8 @@ export interface IUser extends Auth{
     password: string;
     email: string;
     googleId: string;
-    
+    refreshToken?: string; // Campo para el Refresh Token
+    refreshTokenExpiry?: Date; // Agrega este campo
 }
 
 const User = mongoose.model('User', userSchema);
